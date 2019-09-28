@@ -1,0 +1,139 @@
+import datetime
+import numpy as np
+from yahoofinancials import YahooFinancials
+
+from datetime import timedelta
+
+t1 = timedelta(weeks=0, days=1, hours=0, seconds=0)
+t2 = timedelta(weeks=0, days=365, hours=0, seconds=0)
+
+begin = str(datetime.date.today() - t2)
+end = str(datetime.date.today() - t1)
+
+
+class Ticker:
+    def __init__(self, ticker, begin=begin, end=end):
+        self.ticker = ticker
+        self.YF = YahooFinancials(ticker)
+        self.historical_data = None
+        self.historical_price_data = None
+        self.begin = begin
+        self.end = end
+
+        # https://github.com/JECSand/yahoofinancials
+        self.all_statement_data_qt = self.YF.get_financial_stmts('quarterly', ['income', 'cash', 'balance'])
+
+
+    def get_historical_price_data(self):
+        self.historical_data = self.YF.get_historical_price_data(self.begin, self.end, 'daily')[self.ticker]
+        self.historical_price_data = self.historical_data['prices']
+
+    def get_close(self):
+        if self.historical_data == None:
+            self.get_historical_price_data()
+
+        close = np.zeros(len(self.historical_price_data))
+
+        for i, price in enumerate(self.historical_price_data):
+            close[i] = (price['high'] + price['open'] + price['close']) / 3.0
+
+        return close
+
+    def get_volume(self):
+        if self.historical_data == None:
+            self.get_historical_price_data()
+
+        close = np.zeros(len(self.historical_price_data))
+
+        for i, price in enumerate(self.historical_price_data):
+            close[i] = price['volume']
+
+        return close
+
+    def get_ma_close(self, len_ma=20):
+        close = self.get_close()
+
+        return Ticker.get_ma(close, len_ma)
+
+    def get_ma_volume(self, len_ma=20):
+        close = self.get_volume()
+
+        return Ticker.get_ma(close, len_ma)
+
+    @staticmethod
+    def get_ma(close, len_ma=20):
+
+        len_close = close.size
+
+        ma_close = np.zeros(len_close)
+
+        if len_close > 2.0 * len_ma:
+            for i in range(len_close - len_ma):
+                ma_close[i + len_ma] = close[i: i + len_ma].mean()
+
+        return ma_close
+
+    def get_boll(self, len_ma=20):
+        close = self.get_close()
+
+        len_close = close.size
+
+        ma_close = np.zeros(len_close)
+        std_close = np.zeros(len_close)
+
+        if len_close > 2.0 * len_ma:
+            for i in range(len_close - len_ma):
+                ma_close[i + len_ma] = close[i: i + len_ma].mean()
+                std_close[i + len_ma] = close[i: i + len_ma].std()
+        return ma_close + 2 * std_close, ma_close, ma_close - 2 * std_close
+
+
+    def return_n(self, len_ma=20):
+        close = self.get_close()
+        len_close = close.size
+
+        ma_close = np.zeros(len_close)
+
+        if len_close > 2.0 * len_ma:
+            for i in range(len_close - len_ma):
+                ma_close[i + len_ma] = np.log(close[i + len_ma] / close[i])
+
+        return ma_close
+
+    # https://www.wikihow.com/Calculate-Historical-Stock-Volatility
+    def get_volatility(self, len_ma=20):
+        ret_urn = self.return_n(len_ma)
+
+        mean_return = ret_urn.mean()
+
+        std_return = np.sqrt((ret_urn - mean_return) ** 2 / (ret_urn.size - 1))
+
+        return std_return
+
+    def get_status_ma(self, len_ma=20, short_period=3):
+
+        ma_short = self.get_ma_close(short_period)
+        ma_close = self.get_ma_close(len_ma)
+
+        close = ma_short
+
+        criterio = (close[close.size - 1] - ma_close[ma_close.size - 1]) / close[close.size - 1]
+
+        return criterio > 0, criterio < 0, 100 * criterio
+
+    '''
+     https://www.investopedia.com/articles/technical/02/082702.asp
+     It is important to note that an increasing price, together with declining volume, is always, without exception, 
+     bearish. When the market is at the top, one would, therefore, expect to see an oversold volume chart. Another 
+     important point: rising volume, together with declining prices, is also bearish.
+    '''
+    def get_vol_osc(self, len_long=20, len_short=5):
+        v_short = self.get_ma_volume(len_short)
+        v_long = self.get_ma_volume(len_long)
+
+        return v_short - v_long
+
+
+
+
+
