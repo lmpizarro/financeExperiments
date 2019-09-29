@@ -24,3 +24,14 @@ if __name__ == '__main__':
     plt.bar(np.arange(vol_osc.size), vol_osc)
     plt.plot(vol_osc)
     plt.show()
+
+    a, b, c = tck.get_lineal_macd()
+
+    plt.figure(figsize=(12.5, 3))
+    plt.plot(a[30:])
+    plt.plot(b[30:])
+    plt.plot(c[30:])
+
+    plt.show()
+
+
