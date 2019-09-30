@@ -8,11 +8,11 @@ import time
 dir_base = os.path.abspath('../')
 sys.path.append(dir_base)
 
-from ticker import MaFastSlow
+from ticker import tickerRT
 
 if __name__ == '__main__':
 
-    fs = MaFastSlow()
+    fs = tickerRT.MaFastSlow()
 
     s = np.ones(10)
     s = np.asarray(
